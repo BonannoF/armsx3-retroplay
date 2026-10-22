@@ -8,8 +8,9 @@
 #   3. Actions tab -> "Build ARMSX3 for RetroPlay" -> Run workflow (one to two hours: LLVM is built from source first).
 #   4. Download the artifact "armsx3-core-android-retroplay" (libarmsx3-core.so, its SHA256 and size) and send it.
 #
-# It follows ARMSX3's README (Building for Android): the third-party checkouts it names, the core's CMake target rpcsx-android for
-# arm64-v8a and Android 12 (API 31), then llvm-strip. Release instead of RelWithDebInfo: the same code without the 1.3 GB of debug data.
+# It builds the core the way ARMSX3's own scripts do (android/configure.sh and android/build-variants.sh; the README is shorter and
+# leaves out the options): from the repository root, no SDL, no system libraries but zlib, LLVM from its submodule linked statically,
+# and the "a11" variant: Android 11 (API 30), armv8.2-a with dotprod and fp16, the most widely compatible of its modern builds.
 
 name: Build ARMSX3 for RetroPlay
 
@@ -19,6 +20,9 @@ on:
       armsx3_ref:
         description: "ARMSX3 commit to build (3ea49c2a = release 1.3.2, 2026-10-20)"
         default: "3ea49c2a394478d6fb64452be922a3b4b9994d3b"
+      march:
+        description: "CPU level (ARMSX3's a11 variant; armv8.1-a is its legacy one)"
+        default: "armv8.2-a+dotprod+fp16"
 
 jobs:
   build:
@@ -26,8 +30,8 @@ jobs:
     timeout-minutes: 350
     env:
       NDK_VERSION: "29.0.14206865"
-      CMAKE_VERSION: "3.31.6"
-      API_LEVEL: "31"
+      CMAKE_VERSION: "3.30.5"
+      API_LEVEL: "30"
     steps:
       - name: Free disk space (LLVM and the emulator need most of the runner's disk)
         run: |
@@ -71,32 +75,52 @@ jobs:
           echo "NDK_ROOT=$ANDROID_SDK_ROOT/ndk/${{ env.NDK_VERSION }}" >> "$GITHUB_ENV"
           echo "$ANDROID_SDK_ROOT/cmake/${{ env.CMAKE_VERSION }}/bin" >> "$GITHUB_PATH"
 
-      - name: Configure
+      - name: Configure (the options of ARMSX3's android/configure.sh)
         working-directory: armsx3
         run: |
-          cmake -B build-android -G Ninja \
+          cmake -S . -B build-android -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE="$NDK_ROOT/build/cmake/android.toolchain.cmake" \
-            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-$API_LEVEL \
-            -DCMAKE_BUILD_TYPE=Release
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-$API_LEVEL \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DUSE_NATIVE_INSTRUCTIONS=OFF \
+            -DUSE_SDL=OFF \
+            -DUSE_SYSTEM_SDL=OFF \
+            -DUSE_GAMEMODE=OFF \
+            -DUSE_SYSTEM_LIBUSB=OFF \
+            -DUSE_SYSTEM_CURL=OFF \
+            -DUSE_SYSTEM_OPENCV=OFF \
+            -DUSE_SYSTEM_FFMPEG=OFF \
+            -DUSE_SYSTEM_ZLIB=ON \
+            -DUSE_DISCORD_RPC=OFF \
+            -DUSE_FAUDIO=OFF \
+            -DUSE_LIBEVDEV=OFF \
+            -DWITH_LLVM=ON \
+            -DBUILD_LLVM=ON \
+            -DSTATIC_LINK_LLVM=ON \
+            -DUSE_LTO=OFF \
+            -DASMJIT_NO_SHM_OPEN=ON \
+            "-DARMSX3_ARM_MARCH=${{ github.event.inputs.march }}"
 
       - name: Build the core
         working-directory: armsx3
-        run: cmake --build build-android --target rpcsx-android -j $(nproc)
+        run: ninja -C build-android android/libarmsx3-core.so
 
       - name: Package
         working-directory: armsx3
         run: |
-          SO=$(find build-android -name 'libarmsx3-core.so' | head -n 1)
-          if [ -z "$SO" ]; then echo "::error::libarmsx3-core.so was not built"; exit 1; fi
+          SO=build-android/android/libarmsx3-core.so
+          if [ ! -f "$SO" ]; then echo "::error::libarmsx3-core.so was not built"; exit 1; fi
           mkdir -p ../out
-          cp "$SO" ../out/libarmsx3-core.so
-          "$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" --strip-unneeded ../out/libarmsx3-core.so
+          "$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" --strip-unneeded -o ../out/libarmsx3-core.so "$SO"
           git log -1 --format='%H' > ../out/COMMIT.txt
           sha256sum ../out/libarmsx3-core.so | tee ../out/SHA256.txt
           stat -c %s ../out/libarmsx3-core.so | tee ../out/BYTES.txt
-          # The functions the app's PS3 bridge needs.
+          # The functions the app's PS3 bridge needs (names may be C++-mangled: matched as text).
+          NM="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+          "$NM" -D --defined-only ../out/libarmsx3-core.so > ../out/EXPORTS.txt
           for f in _rpcsx_initialize _rpcsx_boot _rpcsx_getState _rpcsx_kill _rpcsx_surfaceEvent _rpcsx_overlayPadData _rpcsx_usbDeviceEvent _rpcsx_installFw _rpcsx_install _rpcsx_settingsSet _rpcsx_getTitleId _rpcsx_saveStateToSlot _rpcsx_loadStateFromSlot; do
-            "$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm" -D --defined-only ../out/libarmsx3-core.so | grep -q " $f" && echo "exports $f" || echo "::warning::$f is not exported"
+            grep -q "$f" ../out/EXPORTS.txt && echo "exports $f" || echo "::warning::$f is not exported"
           done
           ls -la ../out
 
