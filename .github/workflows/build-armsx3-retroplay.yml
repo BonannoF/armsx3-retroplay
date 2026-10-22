@@ -55,6 +55,15 @@ jobs:
           [ -d android/armsx3-ui/app/src/main/cpp/libadrenotools/include ] || git clone --depth 1 --recursive https://github.com/bylaws/libadrenotools android/armsx3-ui/app/src/main/cpp/libadrenotools
           git log -1 --format='ARMSX3 %H %cd %s'
 
+      - name: Fix a header name only a macOS build finds
+        working-directory: armsx3
+        run: |
+          # FrameGenTypes.h includes "Config.h", which is not in the repository: the only one is Utilities/Config.h (which it already
+          # gets through Emu/system_config.h). ARMSX3 is built on macOS, whose include search finds it anyway; Linux stops on it.
+          F=rpcs3/Emu/RSX/VK/FrameGen/FrameGenTypes.h
+          sed -i 's|#include "Config.h"|#include "Utilities/Config.h"|' "$F"
+          grep -n 'Config.h' "$F"
+
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
