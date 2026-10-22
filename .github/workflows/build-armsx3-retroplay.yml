@@ -64,6 +64,53 @@ jobs:
           sed -i 's|#include "Config.h"|#include "Utilities/Config.h"|' "$F"
           grep -n 'Config.h' "$F"
 
+      - name: Fix every include written in the wrong case (macOS ignores the case of file names, Linux does not)
+        working-directory: armsx3
+        shell: python
+        run: |
+          import os, re
+          root = os.getcwd()
+          skip = {'.git', 'build-android'}
+          real = {}
+          for d, dirs, files in os.walk(root):
+              dirs[:] = [x for x in dirs if x not in skip]
+              for f in files:
+                  p = os.path.relpath(os.path.join(d, f), root).replace(os.sep, '/')
+                  real.setdefault(p.lower(), p)
+          exact = set(real.values())
+          bases = ['', 'rpcs3/', 'rpcs3/Emu/', 'Utilities/', '3rdparty/', 'android/src/']
+          pattern = re.compile(r'(#\s*include\s*["<])([^">]+)([">])')
+          fixed = 0
+          for top in ('rpcs3', 'Utilities', 'android/src', '3rdparty/lsfg'):
+              for d, dirs, files in os.walk(os.path.join(root, top)):
+                  dirs[:] = [x for x in dirs if x not in skip]
+                  for f in files:
+                      if not f.endswith(('.cpp', '.h', '.hpp', '.inl', '.c', '.cc')):
+                          continue
+                      path = os.path.join(d, f)
+                      here = os.path.relpath(d, root).replace(os.sep, '/') + '/'
+                      with open(path, encoding='utf-8', errors='surrogateescape') as fh:
+                          text = fh.read()
+                      def repl(m):
+                          global fixed
+                          inc = m.group(2)
+                          candidates = [os.path.normpath(here + inc).replace(os.sep, '/')] + [b + inc for b in bases]
+                          if any(c in exact for c in candidates):
+                              return m.group(0)
+                          for c in candidates:
+                              hit = real.get(c.lower())
+                              if hit and hit != c:
+                                  good = hit[len(hit) - len(inc):]
+                                  print(f'{os.path.relpath(path, root)}: {inc} -> {good}')
+                                  fixed += 1
+                                  return m.group(1) + good + m.group(3)
+                          return m.group(0)
+                      new = pattern.sub(repl, text)
+                      if new != text:
+                          with open(path, 'w', encoding='utf-8', errors='surrogateescape') as fh:
+                              fh.write(new)
+          print(f'{fixed} include(s) fixed')
+
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
