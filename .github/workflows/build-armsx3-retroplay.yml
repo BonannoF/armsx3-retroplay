@@ -1,6 +1,7 @@
 # Builds the ARMSX3 core (the PlayStation 3 emulator of the ARMSX2 team: RPCS3 for Android on ARM64, GPL-2.0) for RetroPlay.
 # ARMSX3's core is RPCSX's Android glue grown further (the same _rpcsx_* functions, plus up to seven pads, save states in slots, pause,
-# rumble per pad, patches, disc changes): the app's PS3 bridge talks to it as it talks to RPCSX. One change: PS3/armsx3-xmb-precompile.patch (below).
+# rumble per pad, patches, disc changes): the app's PS3 bridge talks to it as it talks to RPCSX. Two changes (below):
+# PS3/armsx3-xmb-precompile.patch and PS3/armsx3-atomic16-padding.patch.
 #
 # How to use it:
 #   1. On GitHub create a new empty repository (private is fine), e.g. "armsx3-retroplay".
@@ -128,6 +129,19 @@ jobs:
           echo "$PATCH_SHA256  ../armsx3-xmb-precompile.patch" | sha256sum -c -
           git apply --check --verbose ../armsx3-xmb-precompile.patch
           git apply ../armsx3-xmb-precompile.patch
+          git diff --stat
+
+      - name: RetroPlay's fix (16-byte atomics keep their padding - the system menu's audio init spun for ever)
+        working-directory: armsx3
+        env:
+          PATCH_SHA256: "552d129a646c84b4cf0e28557120d4512f65f1a31c16152cdd60a48352eac411"
+          PATCH_BASE64: "LS0tIGEvcnBjczMvdXRpbC9hdG9taWMuaHBwCisrKyBiL3JwY3MzL3V0aWwvYXRvbWljLmhwcApAQCAtMTA4Miw3ICsxMDgyLDE0IEBACiAKIAkJLy8gT25lIENBU1BBTCB0aGF0IGNvbXBhcmVzIGFuZCBzd2FwcyBhIHJlZ2lzdGVyIHBhaXIgd2l0aCBpdHNlbGY6IHdoYXRldmVyIHRoZSBjb21wYXJpc29uCiAJCS8vIGZpbmRzLCBpdCB3cml0ZXMgYmFjayBvbmx5IHRoZSB2YWx1ZSBhbHJlYWR5IHRoZXJlLCBhbmQgcmV0dXJucyB0aGUgY3VycmVudCB2YWx1ZS4KLQkJcmV0dXJuIHN0ZDo6Yml0X2Nhc3Q8VD4oX19hdG9taWNfbG9hZF9uKHJlaW50ZXJwcmV0X2Nhc3Q8Y29uc3QgdTEyOCo+KCZkZXN0KSwgX19BVE9NSUNfU0VRX0NTVCkpOworCQkvLyBSZXRyb1BsYXk6IGNvcGllZCB3aXRoIG1lbWNweSwgYXMgdXBzdHJlYW0gZG9lcywgbm90IHN0ZDo6Yml0X2Nhc3QuIFRoZSBwYWRkaW5nIG9mIGEgVAorCQkvLyAocnN4YXVkaW8ncyBjYWxsYmFja19jb25maWcgaGFzIDEyIGJpdHMgb2YgaXQpIGNvbWVzIG91dCBvZiBiaXRfY2FzdCBpbmRldGVybWluYXRlLCBzbyB0aGUKKwkJLy8gdmFsdWUgY29tcGFyZV9leGNoYW5nZSBpcyBnaXZlbiBiYWNrIG5ldmVyIG1hdGNoZXMgbWVtb3J5IGFuZCBhdG9taWNfb3Agc3BpbnMgZm9yIGV2ZXI6IHRoZQorCQkvLyBzeXN0ZW0gbWVudSdzIEFVRElPX0lOSVQgbmV2ZXIgcmV0dXJuZWQgYW5kIGl0cyBBViBwb3J0IGFuc3dlcmVkIG5vdGhpbmcuCisJCWNvbnN0IHUxMjggZGF0YSA9IF9fYXRvbWljX2xvYWRfbihyZWludGVycHJldF9jYXN0PGNvbnN0IHUxMjgqPigmZGVzdCksIF9fQVRPTUlDX1NFUV9DU1QpOworCQlUIHJlc3VsdDsKKwkJc3RkOjptZW1jcHkoJnJlc3VsdCwgJmRhdGEsIDE2KTsKKwkJcmV0dXJuIHJlc3VsdDsKIAl9CiAKIAlzdGF0aWMgaW5saW5lIFQgb2JzZXJ2ZShjb25zdCBUJiBkZXN0KQpAQCAtMTA5MywyMiArMTEwMCwzMCBAQAogCiAJc3RhdGljIGlubGluZSBib29sIGNvbXBhcmVfZXhjaGFuZ2UoVCYgZGVzdCwgVCYgY29tcCwgVCBleGNoKQogCXsKLQkJLy8gT25lIENBU1BBTCB3aGVyZSB0aGVyZSB1c2VkIHRvIGJlIGFuIExEQVhQL1NUTFhQIGxvb3AuCi0JCXUxMjggY21wID0gc3RkOjpiaXRfY2FzdDx1MTI4Pihjb21wKTsKKwkJLy8gT25lIENBU1BBTCB3aGVyZSB0aGVyZSB1c2VkIHRvIGJlIGFuIExEQVhQL1NUTFhQIGxvb3AuIFRoZSBieXRlcyBnbyB0aHJvdWdoIG1lbWNweSwgcGFkZGluZworCQkvLyBpbmNsdWRlZCAoc2VlIGxvYWQpLgorCQl1MTI4IGNtcCwgZXhjOworCQlzdGQ6Om1lbWNweSgmY21wLCAmY29tcCwgMTYpOworCQlzdGQ6Om1lbWNweSgmZXhjLCAmZXhjaCwgMTYpOwogCi0JCWlmIChfX2F0b21pY19jb21wYXJlX2V4Y2hhbmdlX24ocmVpbnRlcnByZXRfY2FzdDx1MTI4Kj4oJmRlc3QpLCAmY21wLCBzdGQ6OmJpdF9jYXN0PHUxMjg+KGV4Y2gpLCBmYWxzZSwgX19BVE9NSUNfU0VRX0NTVCwgX19BVE9NSUNfU0VRX0NTVCkpCisJCWlmIChfX2F0b21pY19jb21wYXJlX2V4Y2hhbmdlX24ocmVpbnRlcnByZXRfY2FzdDx1MTI4Kj4oJmRlc3QpLCAmY21wLCBleGMsIGZhbHNlLCBfX0FUT01JQ19TRVFfQ1NULCBfX0FUT01JQ19TRVFfQ1NUKSkKIAkJewogCQkJcmV0dXJuIHRydWU7CiAJCX0KIAotCQljb21wID0gc3RkOjpiaXRfY2FzdDxUPihjbXApOworCQlzdGQ6Om1lbWNweSgmY29tcCwgJmNtcCwgMTYpOwogCQlyZXR1cm4gZmFsc2U7CiAJfQogCiAJc3RhdGljIGlubGluZSBUIGV4Y2hhbmdlKFQmIGRlc3QsIFQgdmFsdWUpCiAJewogCQkvLyBBIENBU1BBTCBsb29wLCB3aGljaCBvbmx5IGdvZXMgcm91bmQgYWdhaW4gd2hlbiBhbm90aGVyIGNvcmUgY2hhbmdlZCB0aGUgdmFsdWUgaW4gYmV0d2Vlbi4KLQkJcmV0dXJuIHN0ZDo6Yml0X2Nhc3Q8VD4oX19hdG9taWNfZXhjaGFuZ2VfbihyZWludGVycHJldF9jYXN0PHUxMjgqPigmZGVzdCksIHN0ZDo6Yml0X2Nhc3Q8dTEyOD4odmFsdWUpLCBfX0FUT01JQ19TRVFfQ1NUKSk7CisJCXUxMjggdmFsOworCQlzdGQ6Om1lbWNweSgmdmFsLCAmdmFsdWUsIDE2KTsKKwkJY29uc3QgdTEyOCBvbGQgPSBfX2F0b21pY19leGNoYW5nZV9uKHJlaW50ZXJwcmV0X2Nhc3Q8dTEyOCo+KCZkZXN0KSwgdmFsLCBfX0FUT01JQ19TRVFfQ1NUKTsKKwkJVCByZXN1bHQ7CisJCXN0ZDo6bWVtY3B5KCZyZXN1bHQsICZvbGQsIDE2KTsKKwkJcmV0dXJuIHJlc3VsdDsKIAl9CiAKIAlzdGF0aWMgaW5saW5lIHZvaWQgc3RvcmUoVCYgZGVzdCwgVCB2YWx1ZSkK"
+        run: |
+          # The same file as PS3/armsx3-atomic16-padding.patch of the RetroPlay project (GPL-2.0: shipped with the app as its changes).
+          echo "$PATCH_BASE64" | base64 -d > ../armsx3-atomic16-padding.patch
+          echo "$PATCH_SHA256  ../armsx3-atomic16-padding.patch" | sha256sum -c -
+          git apply --check --verbose ../armsx3-atomic16-padding.patch
+          git apply ../armsx3-atomic16-padding.patch
           git diff --stat
 
       - name: RetroPlay diagnostics (test builds only - the VUART AV port of the system menu)
