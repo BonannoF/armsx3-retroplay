@@ -26,6 +26,9 @@ on:
       mtune:
         description: "CPU the code is scheduled for (any arm64 phone still runs it): cortex-a78 = the big cores of Snapdragon 8xx and Dimensity"
         default: "cortex-a78"
+      diagnostics:
+        description: "Test build only: add RetroPlay's VUART log lines (PS3/armsx3-uart-diag.patch). Never ship it."
+        default: "false"
 
 jobs:
   build:
@@ -125,6 +128,19 @@ jobs:
           echo "$PATCH_SHA256  ../armsx3-xmb-precompile.patch" | sha256sum -c -
           git apply --check --verbose ../armsx3-xmb-precompile.patch
           git apply ../armsx3-xmb-precompile.patch
+          git diff --stat
+
+      - name: RetroPlay diagnostics (test builds only - the VUART AV port of the system menu)
+        if: ${{ github.event.inputs.diagnostics == 'true' }}
+        working-directory: armsx3
+        env:
+          PATCH_SHA256: "1740ecf8262ede695721b8e9239a92c19828747af22a76a68e356110d9d42134"
+          PATCH_GZ_BASE64: "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"
+        run: |
+          echo "$PATCH_GZ_BASE64" | base64 -d | gunzip > ../armsx3-uart-diag.patch
+          echo "$PATCH_SHA256  ../armsx3-uart-diag.patch" | sha256sum -c -
+          git apply --check --verbose ../armsx3-uart-diag.patch
+          git apply ../armsx3-uart-diag.patch
           git diff --stat
 
       - name: Setup Java
