@@ -1,6 +1,6 @@
 # Builds the ARMSX3 core (the PlayStation 3 emulator of the ARMSX2 team: RPCS3 for Android on ARM64, GPL-2.0) for RetroPlay.
 # ARMSX3's core is RPCSX's Android glue grown further (the same _rpcsx_* functions, plus up to seven pads, save states in slots, pause,
-# rumble per pad, patches, disc changes): the app's PS3 bridge talks to it as it talks to RPCSX. No change to its code is needed.
+# rumble per pad, patches, disc changes): the app's PS3 bridge talks to it as it talks to RPCSX. One change: PS3/armsx3-xmb-precompile.patch (below).
 #
 # How to use it:
 #   1. On GitHub create a new empty repository (private is fine), e.g. "armsx3-retroplay".
@@ -18,11 +18,14 @@ on:
   workflow_dispatch:
     inputs:
       armsx3_ref:
-        description: "ARMSX3 commit to build (3ea49c2a = release 1.3.2, 2026-10-20)"
-        default: "3ea49c2a394478d6fb64452be922a3b4b9994d3b"
+        description: "ARMSX3 commit to build (054291ef = release 1.4.1)"
+        default: "054291ef7cf2c166c17163fc03667f4086885844"
       march:
         description: "CPU level (ARMSX3's a11 variant; armv8.1-a is its legacy one)"
         default: "armv8.2-a+dotprod+fp16"
+      mtune:
+        description: "CPU the code is scheduled for (any arm64 phone still runs it): cortex-a78 = the big cores of Snapdragon 8xx and Dimensity"
+        default: "cortex-a78"
 
 jobs:
   build:
@@ -111,6 +114,19 @@ jobs:
                               fh.write(new)
           print(f'{fixed} include(s) fixed')
 
+      - name: RetroPlay's change (the system menu precompiles only the modules it runs)
+        working-directory: armsx3
+        env:
+          PATCH_SHA256: "5b69a0211cf6f3763077c554bac572811d2a53de26b601fbd8992a26e097a6e1"
+          PATCH_BASE64: "LS0tIGEvcnBjczMvRW11L0NlbGwvUFBVVGhyZWFkLmNwcAorKysgYi9ycGNzMy9FbXUvQ2VsbC9QUFVUaHJlYWQuY3BwCkBAIC00NzY0LDYgKzQ3NjQsNDcgQEAKIAogCWNvbnN0IHN0ZDo6c3RyaW5nIGZpcm13YXJlX3NwcnhfcGF0aCA9IHZmczo6Z2V0KCIvZGV2X2ZsYXNoL3N5cy9leHRlcm5hbC8iKTsKIAorCS8vIFJldHJvUGxheTogYm9vdGluZyB0aGUgc3lzdGVtIG1lbnUgcHJlY29tcGlsZXMgd2hhdCB0aGUgbWVudSBydW5zLCBub3QgdGhlIHdob2xlIGZpcm13YXJlLiBUaGUgQmx1LXJheSBwbGF5ZXIsIHRoZSBQUzEvUFMyL1BTUAorCS8vIGVtdWxhdG9ycywgdGhlIHdlYiBicm93c2VyIGFuZCBhIGZldyByYXJlbHkgb3BlbmVkIGFwcGxpY2F0aW9ucyBhcmUgbGVmdCBvdXQ6IHRoZXkgYXJlIGNvbXBpbGVkIHdoZW4gdGhleSBhcmUgZmlyc3QgbG9hZGVkLAorCS8vIGFzIGEgZ2FtZSdzIG1vZHVsZXMgYXJlLiBPbiBhIHBob25lIHRoZSB3aG9sZSBmaXJtd2FyZSB0YWtlcyBtb3N0IG9mIGFuIGhvdXI7IHRoZSBtZW51J3MgcGFydCBhIGZyYWN0aW9uIG9mIGl0LgorCXN0ZDo6c3RyaW5nIHhtYl9mbGFzaF9yb290OworCisJaWYgKEVtdS5HZXRCb290KCkuZW5kc193aXRoKCJ2c2guc2VsZiIpKQorCXsKKwkJeG1iX2ZsYXNoX3Jvb3QgPSB2ZnM6OmdldCgiL2Rldl9mbGFzaC8iKTsKKworCQl3aGlsZSAoIXhtYl9mbGFzaF9yb290LmVtcHR5KCkgJiYgKHhtYl9mbGFzaF9yb290LmJhY2soKSA9PSAnLycgfHwgeG1iX2ZsYXNoX3Jvb3QuYmFjaygpID09ICdcXCcpKQorCQkJeG1iX2ZsYXNoX3Jvb3QucG9wX2JhY2soKTsKKworCQlpZiAoIXhtYl9mbGFzaF9yb290LmVtcHR5KCkpCisJCQl4bWJfZmxhc2hfcm9vdCArPSAnLyc7CisJfQorCisJYXV0byB4bWJfc2tpcHNfZGlyID0gWyZdKGNvbnN0IHN0ZDo6c3RyaW5nJiBwYXJlbnQsIGNvbnN0IHN0ZDo6c3RyaW5nJiBuYW1lKSAtPiBib29sCisJeworCQlpZiAoeG1iX2ZsYXNoX3Jvb3QuZW1wdHkoKSkKKwkJCXJldHVybiBmYWxzZTsKKworCQlpZiAocGFyZW50ID09IHhtYl9mbGFzaF9yb290KQorCQkJcmV0dXJuIG5hbWUgPT0gImJkcGxheWVyIiB8fCBuYW1lID09ICJwczFlbXUiIHx8IG5hbWUgPT0gInBzMmVtdSIgfHwgbmFtZSA9PSAicHNwZW11IjsKKworCQlyZXR1cm4gcGFyZW50ID09IHhtYl9mbGFzaF9yb290ICsgInZzaC8iICYmIG5hbWUgPT0gInJlc291cmNlIjsKKwl9OworCisJYXV0byB4bWJfc2tpcHNfbW9kdWxlID0gWyZdKGNvbnN0IHN0ZDo6c3RyaW5nJiBwYXJlbnQsIGNvbnN0IHN0ZDo6c3RyaW5nJiBuYW1lKSAtPiBib29sCisJeworCQlpZiAoeG1iX2ZsYXNoX3Jvb3QuZW1wdHkoKSB8fCBwYXJlbnQgIT0geG1iX2ZsYXNoX3Jvb3QgKyAidnNoL21vZHVsZS8iKQorCQkJcmV0dXJuIGZhbHNlOworCisJCXN0YXRpYyBjb25zdCBzdGQ6OnN0cmluZ192aWV3IHNraXBwZWRbXSA9CisJCXsKKwkJCSJ3ZWJicm93c2VyX3BsdWdpbi5zcHJ4IiwgIndlYnJlbmRlcl9wbHVnaW4uc3ByeCIsICJ2aWRlb2VkaXRvcl9wbHVnaW4uc3ByeCIsICJhdmNfcGx1Z2luLnNwcngiLCAibmV3c3RvcmVfcGx1Z2luLnNwcngiLAorCQkJInNhY2RfcGx1Z2luLnNwcngiLCAibXRwaW5pdGlhdG9yX3BsdWdpbi5zcHJ4IiwgInJlZ2NhbV9wbHVnaW4uc3ByeCIsCisJCX07CisKKwkJcmV0dXJuIG5hbWUuc3RhcnRzX3dpdGgoInNpbGsiKSB8fCBuYW1lLnN0YXJ0c193aXRoKCJwcmludF8iKSB8fCBzdGQ6OmZpbmQoc3RkOjpiZWdpbihza2lwcGVkKSwgc3RkOjplbmQoc2tpcHBlZCksIG5hbWUpICE9IHN0ZDo6ZW5kKHNraXBwZWQpOworCX07CisKIAlzdHJ1Y3QgZmlsZV9pbmZvCiAJewogCQlzdGQ6OnN0cmluZyBwYXRoOwpAQCAtNDgwNCw3ICs0ODQ1LDcgQEAKIAogCQkJaWYgKGVudHJ5LmlzX2RpcmVjdG9yeSkKIAkJCXsKLQkJCQlpZiAoZW50cnkubmFtZSAhPSAiLiIgJiYgZW50cnkubmFtZSAhPSAiLi4iKQorCQkJCWlmIChlbnRyeS5uYW1lICE9ICIuIiAmJiBlbnRyeS5uYW1lICE9ICIuLiIgJiYgIXhtYl9za2lwc19kaXIoZGlyX3F1ZXVlW2ldLCBlbnRyeS5uYW1lKSkKIAkJCQl7CiAJCQkJCWRpcl9xdWV1ZS5lbXBsYWNlX2JhY2soZGlyX3F1ZXVlW2ldICsgZW50cnkubmFtZSArICcvJyk7CiAJCQkJfQpAQCAtNDg1OSw3ICs0OTAwLDcgQEAKIAkJCS8vIENoZWNrIFBSWCBmaWxlbmFtZQogCQkJaWYgKHVwcGVyLmVuZHNfd2l0aCgiLlBSWCIpIHx8ICh1cHBlci5lbmRzX3dpdGgoIi5TUFJYIikgJiYgZW50cnkubmFtZSAhPSAibGliZnNfdXRpbGl0eV9pbml0LnNwcngic3YpKQogCQkJewotCQkJCWlmIChpc19pZ25vcmVkKDApKQorCQkJCWlmIChpc19pZ25vcmVkKDApIHx8IHhtYl9za2lwc19tb2R1bGUoZGlyX3F1ZXVlW2ldLCBlbnRyeS5uYW1lKSkKIAkJCQl7CiAJCQkJCWNvbnRpbnVlOwogCQkJCX0K"
+        run: |
+          # The same file as PS3/armsx3-xmb-precompile.patch of the RetroPlay project (GPL-2.0: shipped with the app as its changes).
+          echo "$PATCH_BASE64" | base64 -d > ../armsx3-xmb-precompile.patch
+          echo "$PATCH_SHA256  ../armsx3-xmb-precompile.patch" | sha256sum -c -
+          git apply --check --verbose ../armsx3-xmb-precompile.patch
+          git apply ../armsx3-xmb-precompile.patch
+          git diff --stat
+
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
@@ -133,6 +149,10 @@ jobs:
 
       - name: Configure (the options of ARMSX3's android/configure.sh)
         working-directory: armsx3
+        env:
+          # Read by CMake's first configure and put before the NDK toolchain's own flags (which a -DCMAKE_CXX_FLAGS would replace).
+          CFLAGS: -mtune=${{ github.event.inputs.mtune }}
+          CXXFLAGS: -mtune=${{ github.event.inputs.mtune }}
         run: |
           cmake -S . -B build-android -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE="$NDK_ROOT/build/cmake/android.toolchain.cmake" \
